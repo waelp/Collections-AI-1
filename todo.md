@@ -1,0 +1,31 @@
+# Project TODO
+
+- [x] Remove default credentials display from login page
+- [x] Implement email notification system for credential changes to waelpg@gmail.com
+- [x] Create User Management page with add/edit/delete functionality
+- [x] Add email notifications when credentials are changed
+- [x] Fix text visibility in select boxes and input fields (dark text on dark background)
+- [x] Update color scheme across all pages for proper contrast
+- [x] Test all pages to ensure text is clearly visible
+- [x] Fix Select component text visibility in ALL pages (DataMapping, Admin, Settings, etc.)
+- [x] Ensure SelectValue shows visible text
+- [x] Verify all dropdown menus have proper contrast
+- [x] Create comprehensive documentation of data relationships, formulas, and calculations
+- [x] Document Excel import data flow and processing
+- [x] List all KPI calculations and their formulas
+- [x] Create complete project archive for GitHub deployment
+- [x] Include all source files and documentation
+- [x] Create professional Landing page before login
+- [x] Update routing to show Landing page first
+- [x] Add navigation from Landing to Login
+- [x] Remove decimal places from all numbers
+- [x] Add thousand separators to all numbers and amounts
+- [x] Update formatting functions globally
+- [x] URGENT: Fix Charts.tsx tooltip formatting to remove decimals
+- [x] URGENT: Add thousand separators to all chart tooltips
+- [x] URGENT: Verify chart numbers display correctly
+- [x] CRITICAL: Find ALL chart components with tooltips
+- [x] CRITICAL: Fix EVERY tooltip formatter in EVERY chart
+- [x] CRITICAL: Test tooltips with real data to verify formatting
+- [ ] Create updated project archive with all recent changes for GitHub
+- [ ] Include updated README and documentation
