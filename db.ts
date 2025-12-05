@@ -1,64 +1,92 @@
-import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { DataState, GlobalParameters } from '@/types/data';
+import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/mysql2";
+import { InsertUser, users } from "../drizzle/schema";
+import { ENV } from './_core/env';
 
-interface CollectionsDB extends DBSchema {
-  data: {
-    key: string;
-    value: DataState;
-  };
-  settings: {
-    key: string;
-    value: GlobalParameters | string;
-  };
+let _db: ReturnType<typeof drizzle> | null = null;
+
+// Lazily create the drizzle instance so local tooling can run without a DB.
+export async function getDb() {
+  if (!_db && process.env.DATABASE_URL) {
+    try {
+      _db = drizzle(process.env.DATABASE_URL);
+    } catch (error) {
+      console.warn("[Database] Failed to connect:", error);
+      _db = null;
+    }
+  }
+  return _db;
 }
 
-const DB_NAME = 'collections_dashboard_db';
-const DB_VERSION = 1;
+export async function upsertUser(user: InsertUser): Promise<void> {
+  if (!user.openId) {
+    throw new Error("User openId is required for upsert");
+  }
 
-export const initDB = async (): Promise<IDBPDatabase<CollectionsDB>> => {
-  return openDB<CollectionsDB>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
-      if (!db.objectStoreNames.contains('data')) {
-        db.createObjectStore('data');
-      }
-      if (!db.objectStoreNames.contains('settings')) {
-        db.createObjectStore('settings');
-      }
-    },
-  });
-};
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot upsert user: database not available");
+    return;
+  }
 
-export const saveDataState = async (state: DataState) => {
-  const db = await initDB();
-  await db.put('data', state, 'current_state');
-};
+  try {
+    const values: InsertUser = {
+      openId: user.openId,
+    };
+    const updateSet: Record<string, unknown> = {};
 
-export const loadDataState = async (): Promise<DataState | undefined> => {
-  const db = await initDB();
-  return db.get('data', 'current_state');
-};
+    const textFields = ["name", "email", "loginMethod"] as const;
+    type TextField = (typeof textFields)[number];
 
-export const saveGlobalParams = async (params: GlobalParameters) => {
-  const db = await initDB();
-  await db.put('settings', params, 'global_params');
-};
+    const assignNullable = (field: TextField) => {
+      const value = user[field];
+      if (value === undefined) return;
+      const normalized = value ?? null;
+      values[field] = normalized;
+      updateSet[field] = normalized;
+    };
 
-export const loadGlobalParams = async (): Promise<GlobalParameters | undefined> => {
-  const db = await initDB();
-  return db.get('settings', 'global_params') as Promise<GlobalParameters | undefined>;
-};
+    textFields.forEach(assignNullable);
 
-export const saveDsoMethod = async (method: string) => {
-  const db = await initDB();
-  await db.put('settings', method, 'dso_method');
-};
+    if (user.lastSignedIn !== undefined) {
+      values.lastSignedIn = user.lastSignedIn;
+      updateSet.lastSignedIn = user.lastSignedIn;
+    }
+    if (user.role !== undefined) {
+      values.role = user.role;
+      updateSet.role = user.role;
+    } else if (user.openId === ENV.ownerOpenId) {
+      values.role = 'admin';
+      updateSet.role = 'admin';
+    }
 
-export const loadDsoMethod = async (): Promise<string | undefined> => {
-  const db = await initDB();
-  return db.get('settings', 'dso_method') as Promise<string | undefined>;
-};
+    if (!values.lastSignedIn) {
+      values.lastSignedIn = new Date();
+    }
 
-export const clearData = async () => {
-  const db = await initDB();
-  await db.delete('data', 'current_state');
-};
+    if (Object.keys(updateSet).length === 0) {
+      updateSet.lastSignedIn = new Date();
+    }
+
+    await db.insert(users).values(values).onDuplicateKeyUpdate({
+      set: updateSet,
+    });
+  } catch (error) {
+    console.error("[Database] Failed to upsert user:", error);
+    throw error;
+  }
+}
+
+export async function getUserByOpenId(openId: string) {
+  const db = await getDb();
+  if (!db) {
+    console.warn("[Database] Cannot get user: database not available");
+    return undefined;
+  }
+
+  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+
+  return result.length > 0 ? result[0] : undefined;
+}
+
+// TODO: add feature queries here as your schema grows.
